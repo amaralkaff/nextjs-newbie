@@ -3,6 +3,8 @@ import { sql } from '@vercel/postgres';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
+import { signIn } from '@/auth';
+import { AuthError } from 'next-auth';
 
 export type State = {
     errors?: {
@@ -58,7 +60,7 @@ export async function createInvoice(
         `;
         revalidatePath('/dashboard/invoices');
         redirect('/dashboard/invoices');
-    } catch (error) {
+    } catch {
         return { message: 'Database Error: Failed to create invoices' };
     }
 };
@@ -90,7 +92,7 @@ export async function updateInvoice(
         SET customer_id = ${customerId}, amount = ${amountInCents}, status = ${status}
         WHERE id = ${id}
       `;
-    } catch (error) {
+    } catch {
       return { message: 'Database Error: Failed to Update Invoice.' };
     }
    
@@ -103,7 +105,26 @@ export async function deleteInvoice(id: string) {
         await sql`DELETE FROM invoices WHERE id = ${id}`;
         revalidatePath('/dashboard/invoices');
         redirect('/dashboard/invoices');
-    } catch (error) {
+    } catch {
         return { message: 'Database Error: Failed to delete invoices' };
     }
 }
+
+export async function authenticate(
+    prevState: string | undefined,
+    formData: FormData,
+  ) {
+    try {
+      await signIn('credentials', formData);
+    } catch (error) {
+      if (error instanceof AuthError) {
+        switch (error.type) {
+          case 'CredentialsSignin':
+            return 'Invalid credentials.';
+          default:
+            return 'Something went wrong.';
+        }
+      }
+      return 'Something went wrong.';
+    }
+  }
